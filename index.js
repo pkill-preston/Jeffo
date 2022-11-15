@@ -1,36 +1,57 @@
-const { Client, Intents, Sweepers, DataManager, GuildMemberRoleManager } = require('discord.js');
-const { token } = require('./config.json');
+const dotenv = require('dotenv')
+const fs = require('node:fs');
+const path = require('node:path');
+dotenv.config()
 
-const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
+const { Client, GatewayIntentBits, Events, Collection } = require("discord.js");
 
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates
+  ],
+})
 
-client.once('ready', () => {
-  console.log('Ready!');
-});
+client.commands = new Collection
 
-client.on('interactionCreate', async interaction => {
-  if (!interaction.isCommand()) return;
+const commandsPath = path.join(__dirname, './commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-  const { commandName } = interaction;
-
-  console.log(commandName)
-
-  if (commandName === 'ping') {
-    await interaction.reply('Pong!');
-  } else if (commandName === 'server') {
-    await interaction.reply(`${interaction.guild.name} best server 😎 ${interaction.guild.iconURL()}`);
-  } else if (commandName === 'user') {
-    const data = [];
-    const guildRoles = interaction.guild.roles.fetch().then(response => console.table(response))
-    await interaction.reply(`Here: ` + JSON.stringify(guildRoles));
-  } else if (commandName === 'random') {
-    await interaction.reply(`Here: `+ Math.floor(Math.random() * 99999));
-  } else if (commandName === 'clear') {
-    limit = await (await interaction.channel.fetch()).messages
-    console.log(limit)
-    await interaction.reply(`Delete messages from 200 seconds`);
+for (const file of commandFiles) {
+  const filePath = path.join(commandsPath, file);
+  const command = require(filePath);
+  // Set a new item in the Collection with the key as the command name and the value as the exported module
+  if ('data' in command && 'execute' in command) {
+    client.commands.set(command.data.name, command);
+  } else {
+    console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
   }
-});
+}
 
+client.on(Events.MessageCreate, async (message) =>{
+  console.log('Here is the message: ', message.content)
+})
 
-client.login(token);
+client.on(Events.InteractionCreate, async (interaction) =>{
+  if (!interaction.isChatInputCommand()) return;
+
+  const command = interaction.client.commands.get(interaction.commandName);
+
+  if (!command) {
+    console.error(`Sorry no command matching ~${interaction.commandName}~ was found.`);
+    return;
+  }
+
+  try {
+    await command.execute(interaction);
+  } catch (error) {
+    console.error(error);
+    await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+  }
+})
+
+client.login(process.env.CLIENT_KEY)
