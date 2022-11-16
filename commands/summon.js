@@ -1,17 +1,30 @@
 const { SlashCommandBuilder } = require('discord.js')
-const { joinVoiceChannel } = require('@discordjs/voice');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource , StreamType, demuxProbe, NoSubscriberBehavior, AudioPlayerStatus, VoiceConnectionStatus, getVoiceConnection } = require('@discordjs/voice');
+const play = require('play-dl')
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('summon')
-    .setDescription('Get over here'),
+    .setDescription('Get over here')
+    .addStringOption(option =>
+      option
+        .setName('song')
+        .setDescription('Song to be played')
+        .setRequired(false)),
   async execute(interaction){
+    let answerOption = interaction.options._hoistedOptions[0]?.value ?? "You didn't say anything"
     const userId = interaction.user.id
     const guildId = interaction.guild.id
-    const userInfo = interaction.guild.members.cache.get(userId)
     const channels = interaction.guild.channels.cache
-    console.log(interaction.guild)
     let summonChannel = ''
+    play.getFreeClientID().then((clientID) => {
+      play.setToken({
+        soundcloud : {
+          client_id : clientID
+        }
+      })
+    })
+    // console.log(interaction.guild)
     try {
       channels.forEach((element) => {
         if(element.type === 2){
@@ -19,8 +32,8 @@ module.exports = {
           channelMembers.forEach( (item) => {
             if(item.id === userId){
               summonChannel = element.id
-              console.log('Found ya:', item.user.username)
-              console.log('At channel:', element.name)
+              // console.log('Found ya:', item.user.username)
+              // console.log('At channel:', element.name)
             }
           })
         }
@@ -33,6 +46,18 @@ module.exports = {
     } catch (e){
       console.log(e)
     }
+    let stream = await play.stream(answerOption)
+    let resource = createAudioResource(stream.stream, {
+      inputType: stream.type
+    })
+    let player = createAudioPlayer({
+      behaviors: {
+        noSubscriber: NoSubscriberBehavior.Play
+      }
+    })
+    player.play(resource)
+
+    connection.subscribe(player)
 
   }
 }
