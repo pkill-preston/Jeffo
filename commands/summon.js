@@ -2,10 +2,18 @@ const { SlashCommandBuilder } = require('discord.js')
 const { joinVoiceChannel, createAudioPlayer, createAudioResource , StreamType, demuxProbe, NoSubscriberBehavior, AudioPlayerStatus, VoiceConnectionStatus, getVoiceConnection } = require('@discordjs/voice');
 const play = require('play-dl')
 
+play.getFreeClientID().then((clientID) => {
+  play.setToken({
+    soundcloud : {
+      client_id : clientID
+    }
+  })
+})
+
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('summon')
-    .setDescription('Get over here')
+    .setName('require')
+    .setDescription('play the song')
     .addStringOption(option =>
       option
         .setName('song')
@@ -17,13 +25,6 @@ module.exports = {
     const guildId = interaction.guild.id
     const channels = interaction.guild.channels.cache
     let summonChannel = ''
-    play.getFreeClientID().then((clientID) => {
-      play.setToken({
-        soundcloud : {
-          client_id : clientID
-        }
-      })
-    })
     // console.log(interaction.guild)
     try {
       channels.forEach((element) => {
@@ -43,21 +44,23 @@ module.exports = {
         guildId: guildId,
         adapterCreator: interaction.guild.voiceAdapterCreator,
       });
+      let stream = await play.stream(answerOption)
+      let resource = createAudioResource(stream.stream, {
+        inputType: stream.type
+      })
+      let player = createAudioPlayer({
+        behaviors: {
+          noSubscriber: NoSubscriberBehavior.Play
+        }
+      })
+
+      player.play(resource)
+
+      console.log("Resource :", resource)
+
+      connection.subscribe(player)
     } catch (e){
       console.log(e)
     }
-    let stream = await play.stream(answerOption)
-    let resource = createAudioResource(stream.stream, {
-      inputType: stream.type
-    })
-    let player = createAudioPlayer({
-      behaviors: {
-        noSubscriber: NoSubscriberBehavior.Play
-      }
-    })
-    player.play(resource)
-
-    connection.subscribe(player)
-
   }
 }
